@@ -11,6 +11,7 @@ const passportLocalMongoose = require('passport-local-mongoose');
 // Note: passport-local is a dependency of passport-local-mongoose and no need to
 // require it explicitly
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const FacebookStrategy = require('passport-facebook').Strategy;
 const findOrCreate = require('mongoose-findorcreate');
 
 const app = express();
@@ -41,7 +42,8 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
 const userSchema = new mongoose.Schema({
   email: String,
   password: String,
-  googleId: String
+  googleId: String,
+  facebookId: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -78,11 +80,26 @@ passport.use(new GoogleStrategy({
   }
 ));
 
+//Facebook strategy
+passport.use(new FacebookStrategy({
+    clientID: process.env.CLIENT_ID_FB,
+    clientSecret: process.env.CLIENT_SECRECT_FB,
+    callbackURL: "http://localhost:3000/auth/facebook/secrets"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    console.log(profile);
+
+    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
 //root route
 app.get("/", function(req, res) {
   res.render("home");
 });
-
+// Google strategy route
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile"] })
 );
@@ -93,6 +110,19 @@ app.get("/auth/google/secrets",
     // Successful authentication, redirect to secrets.
     res.redirect('/secrets');
   });
+//Facebook strategy route
+
+app.get('/auth/facebook',
+  passport.authenticate("facebook")
+);
+
+app.get('/auth/facebook/secrets',
+  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  function(req, res) {
+    // Successful authentication, redirect secrets.
+    res.redirect('/secrets');
+  });
+
 
 app.get("/login", function(req, res) {
   res.render("login");
@@ -108,6 +138,19 @@ app.get("/secrets", function(req, res) {
   } else {
     res.redirect("/login");
   }
+});
+
+app.get("/submit", function(req, res) {
+  if(req.isAuthenticated()) {
+    res.render("submit");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.post("/submit", function(req, res){
+  const submittedSecret = req.body.secret;
+  
 });
 
 app.get("/logout", function(req, res) {
